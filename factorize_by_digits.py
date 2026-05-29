@@ -62,13 +62,14 @@ def build_extend_map(primes, m, timeout_sec=None):
     timeout_sec — если задан, через time.monotonic() бросает TimeoutError.
     """
     deadline = time.monotonic() + timeout_sec if timeout_sec else None
+    powers = [10**t for t in range(1, m)]
     ext = {}
     for p in primes:
         if deadline is not None and time.monotonic() > deadline:
             raise TimeoutError(f"build_extend_map превысил {timeout_sec}s")
-        for t in range(1, m):
-            tail = p % (10**t)       # младшие t цифр числа p
-            d = (p // (10**t)) % 10  # следующая цифра слева от хвоста
+        for t, pow_t in enumerate(powers, start=1):
+            tail = p % pow_t
+            d = (p // pow_t) % 10
             key = (t, tail)
             if key not in ext:
                 ext[key] = set()
