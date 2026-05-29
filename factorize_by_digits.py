@@ -7,6 +7,9 @@
   - 'fast' (default): presieve по первым 10 простым + Miller–Rabin
 """
 
+from collections import deque
+import time
+
 from prime_utils import is_prime_fast, is_probable_prime_mr, passes_small_prime_filter
 from prime_utils import m_digit_primes_fast, PrimeStats
 
@@ -17,6 +20,8 @@ from prime_utils import m_digit_primes_fast, PrimeStats
 
 def sieve(limit):
     """Решето Эратосфена: все простые <= limit."""
+    if limit > 10**7:
+        raise ValueError(f"sieve: limit={limit} > 10^7 требует >100MB — используйте method='fast'")
     is_prime = bytearray(b'\x01') * (limit + 1)
     is_prime[0:2] = b'\x00\x00'
     for i in range(2, int(limit**0.5) + 1):
@@ -41,7 +46,7 @@ def m_digit_primes(m, method='fast'):
     return m_digit_primes_fast(m)
 
 
-def build_extend_map(primes, m):
+def build_extend_map(primes, m, timeout_sec=None):
     """
     extend_map[(t, tail)] -> set[int]  (цифры d, дописываемые слева)
 
@@ -53,12 +58,14 @@ def build_extend_map(primes, m):
 
     Если tail не может быть хвостом никакого простого,
     то ключа в словаре нет — ветка обрезается.
+
+    timeout_sec — если задан, через time.monotonic() бросает TimeoutError.
     """
-    # Для каждого простого числа разбиваем его на хвост (младшие t цифр)
-    # и цифру d, которая может стоять слева от этого хвоста.
-    # ext[(t, tail)] — множество цифр d, при которых d*10^t + tail — начало простого.
+    deadline = time.monotonic() + timeout_sec if timeout_sec else None
     ext = {}
     for p in primes:
+        if deadline is not None and time.monotonic() > deadline:
+            raise TimeoutError(f"build_extend_map превысил {timeout_sec}s")
         for t in range(1, m):
             tail = p % (10**t)       # младшие t цифр числа p
             d = (p // (10**t)) % 10  # следующая цифра слева от хвоста
@@ -87,6 +94,12 @@ def factorize_by_digits(N, m, method='fast'):
     method='sieve' — решето Эратосфена (legacy).
     Возвращает список пар (p, q) с p ≤ q, p·q = N.
     """
+    if not isinstance(N, int) or N <= 1:
+        raise ValueError(f"N должно быть целым > 1, получено {N!r}")
+    if not isinstance(m, int) or m < 2:
+        raise ValueError(f"m должно быть целым >= 2, получено {m!r}")
+    if N % 10 == 0:
+        raise ValueError(f"N={N} кратно 10 — множители не могут оканчиваться на 0")
     primes = m_digit_primes(m, method=method)
     ext = build_extend_map(primes, m)
 
@@ -100,20 +113,24 @@ def factorize_by_digits(N, m, method='fast'):
 
     results = set()
 
-    def dfs(t, p_t, q_t):
-        """t — сколько разрядов уже зафиксировано,
-        p_t, q_t — части чисел, состоящие из младших t цифр."""
+    # Итеративный DFS: стек из кортежей (t, p_t, q_t)
+    # вместо рекурсии — уходит RecursionError для m >= 15
+    stack = deque((1, a, b) for a, b in start_pairs)
+
+    while stack:
+        t, p_t, q_t = stack.pop()
+
         # Все m разрядов заполнены — проверяем точное равенство
         if t == m:
             if p_t * q_t == N:
                 results.add((p_t, q_t) if p_t <= q_t else (q_t, p_t))
-            return
+            continue
 
         # Какие цифры можно дописать слева к p_t и q_t?
         p_candidates = ext.get((t, p_t))
         q_candidates = ext.get((t, q_t))
         if p_candidates is None or q_candidates is None:
-            return  # тупик: такой хвост не может быть началом простого
+            continue  # тупик: такой хвост не может быть началом простого
 
         # Каким должен быть остаток произведения по модулю 10^(t+1)
         mod = 10 ** (t + 1)
@@ -125,11 +142,7 @@ def factorize_by_digits(N, m, method='fast'):
             for d_q in q_candidates:
                 q_next = d_q * (10**t) + q_t
                 if (p_next * q_next) % mod == target:
-                    dfs(t + 1, p_next, q_next)
-
-    # Запускаем DFS от каждой допустимой пары последних цифр
-    for a, b in start_pairs:
-        dfs(1, a, b)
+                    stack.append((t + 1, p_next, q_next))
 
     return sorted(results)
 

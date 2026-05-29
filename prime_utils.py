@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import dataclass, field
 
 SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
@@ -78,6 +79,12 @@ def is_prime_fast(n: int) -> bool:
 
 
 def m_digit_primes_fast(m: int, stats: PrimeStats | None = None) -> list[int]:
+    if m >= 9:
+        warnings.warn(
+            f"m={m}: генерация простых займёт десятки минут. "
+            "Для m>=9 рекомендуется внешняя база или сегментированное решето.",
+            RuntimeWarning, stacklevel=2,
+        )
     low = 10 ** (m - 1)
     high = 10**m - 1
     result = []
