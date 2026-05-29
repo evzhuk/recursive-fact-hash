@@ -2,15 +2,23 @@
 Факторизация N = p*q перебором по разрядам справа налево
 с использованием дерева вариантов, хэш-структур и рекурсии.
 
-Алгоритм описан в задании.
+Режимы получения простых чисел:
+  - 'sieve' (legacy): решето Эратосфена (полный bytearray)
+  - 'fast' (default): presieve по первым 10 простым + Miller–Rabin
 """
+
+from prime_utils import is_prime_fast, is_probable_prime_mr, passes_small_prime_filter
+from prime_utils import m_digit_primes_fast, PrimeStats
+
+
+# ---------------------------------------------------------------------------
+# Legacy: решето Эратосфена (полная генерация, память ~10^m байт)
+# ---------------------------------------------------------------------------
 
 def sieve(limit):
     """Решето Эратосфена: все простые <= limit."""
-    # Изначально считаем все числа простыми (1), кроме 0 и 1
     is_prime = bytearray(b'\x01') * (limit + 1)
     is_prime[0:2] = b'\x00\x00'
-    # Вычёркиваем кратные каждого простого, начиная с i^2
     for i in range(2, int(limit**0.5) + 1):
         if is_prime[i]:
             step = i
@@ -19,12 +27,18 @@ def sieve(limit):
     return [i for i, v in enumerate(is_prime) if v]
 
 
-def m_digit_primes(m):
-    """Все простые числа длины ровно m десятичных цифр."""
-    low = 10 ** (m - 1)    # минимальное m-значное число (10^(m-1))
-    high = 10**m - 1        # максимальное m-значное число (10^m - 1)
-    all_primes = sieve(high)
-    return [p for p in all_primes if p >= low]
+def m_digit_primes(m, method='fast'):
+    """Все простые числа длины ровно m десятичных цифр.
+
+    method='fast' (default) — Miller–Rabin + presieve.
+    method='sieve' — решето Эратосфена (legacy).
+    """
+    if method == 'sieve':
+        low = 10 ** (m - 1)
+        high = 10**m - 1
+        all_primes = sieve(high)
+        return [p for p in all_primes if p >= low]
+    return m_digit_primes_fast(m)
 
 
 def build_extend_map(primes, m):
@@ -66,13 +80,14 @@ def last_digit_pairs(N):
     return [(a, b) for a in digits for b in digits if (a * b) % 10 == r]
 
 
-def factorize_by_digits(N, m):
+def factorize_by_digits(N, m, method='fast'):
     """
     Вход: N = p·q, m — число десятичных цифр в p и q.
+    method='fast' (default) — Miller–Rabin + presieve.
+    method='sieve' — решето Эратосфена (legacy).
     Возвращает список пар (p, q) с p ≤ q, p·q = N.
     """
-    # Генерируем все m-значные простые и строим карту допустимых расширений
-    primes = m_digit_primes(m)
+    primes = m_digit_primes(m, method=method)
     ext = build_extend_map(primes, m)
 
     # Отбираем стартовые пары последних цифр (единицы),
