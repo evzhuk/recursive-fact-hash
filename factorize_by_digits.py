@@ -114,6 +114,8 @@ def factorize_by_digits(N, m, method='fast'):
 
     results = set()
 
+    powers = [10**t for t in range(m + 1)]
+
     # Итеративный DFS: стек из кортежей (t, p_t, q_t)
     # вместо рекурсии — уходит RecursionError для m >= 15
     stack = deque((1, a, b) for a, b in start_pairs)
@@ -134,8 +136,8 @@ def factorize_by_digits(N, m, method='fast'):
             continue  # тупик: такой хвост не может быть началом простого
 
         # Каким должен быть остаток произведения по модулю 10^(t+1)
-        power_t = 10 ** t
-        mod = power_t * 10
+        power_t = powers[t]
+        mod = powers[t + 1]
         target = N % mod
 
         # Перебираем все пары цифр-кандидатов, проверяя условие mod
