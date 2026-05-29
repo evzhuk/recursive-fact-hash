@@ -74,6 +74,18 @@ class TestMDigitPrimesFast(unittest.TestCase):
         self.assertEqual(res[0], 11)
         self.assertEqual(res[-1], 97)
 
+    def test_3_digit(self):
+        res = m_digit_primes_fast(3)
+        self.assertEqual(len(res), 143)
+        self.assertEqual(res[0], 101)
+        self.assertEqual(res[-1], 997)
+
+    def test_4_digit(self):
+        res = m_digit_primes_fast(4)
+        self.assertEqual(len(res), 1061)
+        self.assertEqual(res[0], 1009)
+        self.assertEqual(res[-1], 9973)
+
 
 class TestMDigitPrimes(unittest.TestCase):
     """m_digit_primes с method='fast' и method='sieve'."""
@@ -96,9 +108,10 @@ class TestPrimeStats(unittest.TestCase):
         res = m_digit_primes_fast(2, stats=stats)
         self.assertEqual(len(res), 21)
         self.assertEqual(stats.primes_found, 21)
-        self.assertEqual(stats.total_candidates, 90)
-        self.assertGreater(stats.filtered_by_small_primes, 0)
-        self.assertGreater(stats.miller_rabin_calls, 0)
+        # wheel30 yields 18 candidates (24 minus 6 малых простых 11,13,17,19,23,29)
+        self.assertEqual(stats.total_candidates, 18)
+        self.assertEqual(stats.filtered_by_small_primes, 0)
+        self.assertEqual(stats.miller_rabin_calls, 18)
 
 
 class TestFactorizeByDigits(unittest.TestCase):
