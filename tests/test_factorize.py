@@ -108,10 +108,10 @@ class TestPrimeStats(unittest.TestCase):
         res = m_digit_primes_fast(2, stats=stats)
         self.assertEqual(len(res), 21)
         self.assertEqual(stats.primes_found, 21)
-        # wheel30 yields 18 candidates (24 minus 6 малых простых 11,13,17,19,23,29)
-        self.assertEqual(stats.total_candidates, 18)
+        # wheel210 yields 5 candidates (21 minus 16 малых простых ≤71)
+        self.assertEqual(stats.total_candidates, 5)
         self.assertEqual(stats.filtered_by_small_primes, 0)
-        self.assertEqual(stats.miller_rabin_calls, 18)
+        self.assertEqual(stats.miller_rabin_calls, 5)
 
 
 class TestFactorizeByDigits(unittest.TestCase):

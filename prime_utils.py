@@ -1,7 +1,10 @@
 import warnings
 from dataclasses import dataclass, field
 
-SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+SMALL_PRIMES = [
+    2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
+    31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+]
 
 
 @dataclass
@@ -79,29 +82,40 @@ def is_prime_fast(n: int) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Колесо mod 30: генерация кандидатов, НЕ кратных 2, 3, 5
-# 8 кандидатов из каждых 30 вместо 30 — сокращение в 3.75×
+# Колесо mod 210 = 2×3×5×7: 48 кандидатов из каждых 210
+# вместо 8 из 30 — на 37.5% меньше кандидатов чем wheel30
 # ---------------------------------------------------------------------------
-_WHEEL30_GAPS = (6, 4, 2, 4, 2, 4, 6, 2)
-_WHEEL30_OFFSETS = (1, 7, 11, 13, 17, 19, 23, 29)
+_WHEEL210_OFFSETS = (
+    1, 11, 13, 17, 19, 23, 29, 31, 37, 41,
+    43, 47, 53, 59, 61, 67, 71, 73, 79, 83,
+    89, 97, 101, 103, 107, 109, 113, 121, 127, 131,
+    137, 139, 143, 149, 151, 157, 163, 167, 169, 173,
+    179, 181, 187, 191, 193, 197, 199, 209,
+)
+
+_WHEEL210_GAPS = tuple(
+    _WHEEL210_OFFSETS[(i + 1) % 48] - _WHEEL210_OFFSETS[i]
+    if i < 47
+    else 210 - _WHEEL210_OFFSETS[47] + _WHEEL210_OFFSETS[0]
+    for i in range(48)
+)
 
 
-def _wheel30_start(low: int) -> tuple[int, int]:
-    base = (low // 30) * 30
-    for i, off in enumerate(_WHEEL30_OFFSETS):
+def _wheel210_start(low: int) -> tuple[int, int]:
+    base = (low // 210) * 210
+    for i, off in enumerate(_WHEEL210_OFFSETS):
         if base + off >= low:
             return base + off, i
-    return base + 30 + _WHEEL30_OFFSETS[0], 0
+    return base + 210 + _WHEEL210_OFFSETS[0], 0
 
 
-def _wheel30_candidates(low: int, high: int):
-    n, i = _wheel30_start(low)
-    gaps = _WHEEL30_GAPS
-    ng = len(gaps)
+def _wheel210_candidates(low: int, high: int):
+    n, i = _wheel210_start(low)
+    gaps = _WHEEL210_GAPS
     while n <= high:
         yield n
         n += gaps[i]
-        i = (i + 1) % ng
+        i = (i + 1) % 48
 
 
 def m_digit_primes_fast(m: int, stats: PrimeStats | None = None) -> list[int]:
@@ -122,7 +136,7 @@ def m_digit_primes_fast(m: int, stats: PrimeStats | None = None) -> list[int]:
             result.append(p)
 
     last_small = SMALL_PRIMES[-1]
-    for n in _wheel30_candidates(low, high):
+    for n in _wheel210_candidates(low, high):
         if n <= last_small:
             continue
         if stats is not None:
