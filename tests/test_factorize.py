@@ -124,6 +124,22 @@ class TestFactorizeByDigits(unittest.TestCase):
     def test_no_factors_prime(self):
         self.assertEqual(factorize_by_digits(211, 2), [])
 
+    def test_dfs_mode_stack(self):
+        self.assertEqual(factorize_by_digits(143, 2, dfs_mode='stack'), [(11, 13)])
+
+    def test_dfs_mode_recursive(self):
+        self.assertEqual(factorize_by_digits(143, 2, dfs_mode='recursive'), [(11, 13)])
+
+    def test_dfs_modes_match(self):
+        for N, m in [(143, 2), (323, 2), (899, 2), (1147, 2), (1763, 2), (121, 2)]:
+            r1 = factorize_by_digits(N, m, dfs_mode='recursive')
+            r2 = factorize_by_digits(N, m, dfs_mode='stack')
+            self.assertEqual(r1, r2, f"Mismatch for N={N}, m={m}")
+
+    def test_dfs_mode_invalid(self):
+        with self.assertRaises(ValueError):
+            factorize_by_digits(143, 2, dfs_mode='invalid')
+
 
 if __name__ == "__main__":
     unittest.main()

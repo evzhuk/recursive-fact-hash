@@ -1,12 +1,13 @@
 """
 Факторизация N = p*q перебором по разрядам справа налево
-с использованием дерева вариантов, хэш-структур и итеративного DFS (deque).
+с использованием дерева вариантов, хэш-структур и рекурсии (или итеративного стека).
 
 Режимы получения простых чисел:
   - 'sieve' (legacy): решето Эратосфена (полный bytearray)
   - 'fast' (default): presieve по первым 10 простым + Miller–Rabin
 """
 
+from array import array
 from collections import deque
 import time
 
@@ -48,33 +49,28 @@ def m_digit_primes(m, method='fast'):
 
 def build_extend_map(primes, m, timeout_sec=None):
     """
-    extend_map[(t, tail)] -> set[int]  (цифры d, дописываемые слева)
+    ext_bits[t, tail] — uint16 битовая маска цифр d (0..9),
+    которые можно дописать слева к хвосту tail длины t.
+    Бит d установлен если существует простое с таким хвостом и такой следующей цифрой.
 
-    Для каждого простого P = d_{m-1}...d_1 (d_1 — единицы):
-      для t = 1..m-1:
-        tail = P % 10^t
-        d   = (P // 10^t) % 10   (следующая слева цифра)
-        extend_map[(t, tail)].add(d)
+    Индексация: t от 1 до m-1, tail от 0 до 10^t - 1.
+    Форма массива: (m, 10^(m-1)) — строки по t, столбцы по tail.
 
-    Если tail не может быть хвостом никакого простого,
-    то ключа в словаре нет — ветка обрезается.
-
-    timeout_sec — если задан, через time.monotonic() бросает TimeoutError.
+    Хранится как плоский array('H') с row_stride = 10^(m-1).
     """
     deadline = time.monotonic() + timeout_sec if timeout_sec else None
-    powers = [10**t for t in range(1, m)]
-    ext = {}
+    powers = [10**t for t in range(m)]
+    cols = powers[m - 1]
+    ext_bits = array('H', [0]) * (m * cols)
     for p in primes:
         if deadline is not None and time.monotonic() > deadline:
             raise TimeoutError(f"build_extend_map превысил {timeout_sec}s")
-        for t, pow_t in enumerate(powers, start=1):
-            tail = p % pow_t
-            d = (p // pow_t) % 10
-            key = (t, tail)
-            if key not in ext:
-                ext[key] = set()
-            ext[key].add(d)
-    return ext
+        for t in range(1, m):
+            tail = p % powers[t]
+            d = (p // powers[t]) % 10
+            idx = t * cols + tail
+            ext_bits[idx] |= 1 << d
+    return ext_bits
 
 
 def last_digit_pairs(N):
@@ -88,11 +84,13 @@ def last_digit_pairs(N):
     return [(a, b) for a in digits for b in digits if (a * b) % 10 == r]
 
 
-def factorize_by_digits(N, m, method='fast'):
+def factorize_by_digits(N, m, method='fast', dfs_mode='recursive'):
     """
     Вход: N = p·q, m — число десятичных цифр в p и q.
     method='fast' (default) — Miller–Rabin + presieve.
     method='sieve' — решето Эратосфена (legacy).
+    dfs_mode='recursive' (default) — рекурсивный DFS.
+    dfs_mode='stack' — итеративный DFS через deque.
     Возвращает список пар (p, q) с p ≤ q, p·q = N.
     """
     if not isinstance(N, int) or N <= 1:
@@ -102,7 +100,8 @@ def factorize_by_digits(N, m, method='fast'):
     if N % 10 == 0:
         raise ValueError(f"N={N} кратно 10 — множители не могут оканчиваться на 0")
     primes = m_digit_primes(m, method=method)
-    ext = build_extend_map(primes, m)
+    ext_bits = build_extend_map(primes, m)
+    cols = 10**(m - 1)
 
     # Отбираем стартовые пары последних цифр (единицы),
     # которые встречаются среди m-значных простых
@@ -116,37 +115,64 @@ def factorize_by_digits(N, m, method='fast'):
 
     powers = [10**t for t in range(m + 1)]
 
-    # Итеративный DFS: стек из кортежей (t, p_t, q_t)
-    # вместо рекурсии — уходит RecursionError для m >= 15
-    stack = deque((1, a, b) for a, b in start_pairs)
+    if dfs_mode == 'recursive':
+        def dfs(t, p_t, q_t):
+            if t == m:
+                if p_t * q_t == N:
+                    results.add((p_t, q_t) if p_t <= q_t else (q_t, p_t))
+                return
+            mask_p = ext_bits[t * cols + p_t]
+            mask_q = ext_bits[t * cols + q_t]
+            if mask_p == 0 or mask_q == 0:
+                return
+            power_t = powers[t]
+            mod = powers[t + 1]
+            target = N % mod
+            for d_p in range(10):
+                if not (mask_p >> d_p & 1):
+                    continue
+                p_next = d_p * power_t + p_t
+                for d_q in range(10):
+                    if not (mask_q >> d_q & 1):
+                        continue
+                    q_next = d_q * power_t + q_t
+                    if (p_next * q_next) % mod == target:
+                        dfs(t + 1, p_next, q_next)
+        for a, b in start_pairs:
+            dfs(1, a, b)
 
-    while stack:
-        t, p_t, q_t = stack.pop()
+    elif dfs_mode == 'stack':
+        stack = deque((1, a, b) for a, b in start_pairs)
+        while stack:
+            t, p_t, q_t = stack.pop()
 
-        # Все m разрядов заполнены — проверяем точное равенство
-        if t == m:
-            if p_t * q_t == N:
-                results.add((p_t, q_t) if p_t <= q_t else (q_t, p_t))
-            continue
+            if t == m:
+                if p_t * q_t == N:
+                    results.add((p_t, q_t) if p_t <= q_t else (q_t, p_t))
+                continue
 
-        # Какие цифры можно дописать слева к p_t и q_t?
-        p_candidates = ext.get((t, p_t))
-        q_candidates = ext.get((t, q_t))
-        if p_candidates is None or q_candidates is None:
-            continue  # тупик: такой хвост не может быть началом простого
+            mask_p = ext_bits[t * cols + p_t]
+            mask_q = ext_bits[t * cols + q_t]
+            if mask_p == 0 or mask_q == 0:
+                continue
 
-        # Каким должен быть остаток произведения по модулю 10^(t+1)
-        power_t = powers[t]
-        mod = powers[t + 1]
-        target = N % mod
+            power_t = powers[t]
+            mod = powers[t + 1]
+            target = N % mod
 
-        # Перебираем все пары цифр-кандидатов, проверяя условие mod
-        for d_p in p_candidates:
-            p_next = d_p * power_t + p_t
-            for d_q in q_candidates:
-                q_next = d_q * power_t + q_t
-                if (p_next * q_next) % mod == target:
-                    stack.append((t + 1, p_next, q_next))
+            for d_p in range(10):
+                if not (mask_p >> d_p & 1):
+                    continue
+                p_next = d_p * power_t + p_t
+                for d_q in range(10):
+                    if not (mask_q >> d_q & 1):
+                        continue
+                    q_next = d_q * power_t + q_t
+                    if (p_next * q_next) % mod == target:
+                        stack.append((t + 1, p_next, q_next))
+
+    else:
+        raise ValueError(f"dfs_mode должен быть 'recursive' или 'stack', получено {dfs_mode!r}")
 
     return sorted(results)
 
