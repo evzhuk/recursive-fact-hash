@@ -29,4 +29,4 @@ python3 -m unittest tests/test_factorize.py -v
 
 ## Лицензия
 
-Apache 2.0. Copyright 2024 Egor Zhuk <tigr36288@gmail.com>
+Apache 2.0. Copyright 2026 Egor Zhuk <tigr36288@gmail.com>
