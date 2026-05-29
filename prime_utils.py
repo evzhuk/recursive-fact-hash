@@ -2,8 +2,6 @@ from dataclasses import dataclass, field
 
 SMALL_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
 
-MR_BASES = [2, 325, 9375, 28178, 450775, 9780504, 1795265022]
-
 
 @dataclass
 class PrimeStats:
