@@ -1,6 +1,6 @@
 """
 Факторизация N = p*q перебором по разрядам справа налево
-с использованием дерева вариантов, хэш-структур и рекурсии.
+с использованием дерева вариантов, хэш-структур и итеративного DFS (deque).
 
 Режимы получения простых чисел:
   - 'sieve' (legacy): решето Эратосфена (полный bytearray)
@@ -133,14 +133,15 @@ def factorize_by_digits(N, m, method='fast'):
             continue  # тупик: такой хвост не может быть началом простого
 
         # Каким должен быть остаток произведения по модулю 10^(t+1)
-        mod = 10 ** (t + 1)
+        power_t = 10 ** t
+        mod = power_t * 10
         target = N % mod
 
         # Перебираем все пары цифр-кандидатов, проверяя условие mod
         for d_p in p_candidates:
-            p_next = d_p * (10**t) + p_t
+            p_next = d_p * power_t + p_t
             for d_q in q_candidates:
-                q_next = d_q * (10**t) + q_t
+                q_next = d_q * power_t + q_t
                 if (p_next * q_next) % mod == target:
                     stack.append((t + 1, p_next, q_next))
 
